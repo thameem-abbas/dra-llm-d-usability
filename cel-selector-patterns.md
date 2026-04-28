@@ -1,6 +1,6 @@
 # CEL Device Selector Patterns for Dynamic Resource Allocation
 
-CEL selectors in DRA ResourceClaims enable precise device matching that goes beyond what DeviceClass names alone can express. The patterns below come from a production admission webhook that pairs GPUs with RDMA-capable NICs for distributed AI workloads. Each pattern is self-contained and reusable in any DRA-based device allocation pipeline.
+CEL selectors in DRA ResourceClaims enable precise device matching that goes beyond what DeviceClass names alone can express. The patterns below come from a DRA admission webhook that pairs GPUs with RDMA-capable NICs for distributed AI workloads. Each pattern is self-contained and reusable in any DRA-based device allocation pipeline.
 
 > **API version:** All examples use the `resource.k8s.io/v1` API, which became GA in Kubernetes 1.34. In the v1 schema, `deviceClassName`, `count`, and `selectors` are nested under an `exactly` sub-field within each device request. If you are migrating from the earlier v1beta1 API, move these three fields from the request top level into `exactly`.
 
@@ -147,7 +147,7 @@ This pattern is the foundation for multi-device, cross-driver topology alignment
 
 ## Combining Patterns: Multi-Pair Claims with NUMA Affinity
 
-In production, these patterns compose. A request for N GPU+NIC pairs generates N request pairs, N PCIe constraints, and (optionally) a NUMA constraint across all NICs. Here is a 2-pair claim with rail pinning and NUMA co-location:
+In practice, these patterns compose. A request for N GPU+NIC pairs generates N request pairs, N PCIe constraints, and (optionally) a NUMA constraint across all NICs. Here is a 2-pair claim with rail pinning and NUMA co-location:
 
 ```yaml
 apiVersion: resource.k8s.io/v1

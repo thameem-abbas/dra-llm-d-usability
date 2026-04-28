@@ -10,7 +10,7 @@
 
 ### Consumer Feedback: DRA Admission Webhook Using pcieRoot/numaNode MatchAttribute Constraints
 
-Sharing feedback from a production DRA webhook consumer perspective. We operate a mutating admission webhook that builds ResourceClaimTemplates pairing NVIDIA GPUs with RDMA NICs for LLM inference workloads. Each GPU-NIC pair uses `matchAttribute` on `resource.kubernetes.io/pcieRoot` (string), and we optionally use `matchAttribute` on `dra.net/numaNode` (int) for NUMA co-location across NICs.
+Sharing feedback from a DRA webhook consumer perspective. We've built a mutating admission webhook that builds ResourceClaimTemplates pairing NVIDIA GPUs with RDMA NICs for LLM inference workloads. Each GPU-NIC pair uses `matchAttribute` on `resource.kubernetes.io/pcieRoot` (string), and we optionally use `matchAttribute` on `dra.net/numaNode` (int) for NUMA co-location across NICs.
 
 **What KEP-5491 improves for us (automatically):**
 

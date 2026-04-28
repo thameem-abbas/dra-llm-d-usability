@@ -10,7 +10,7 @@
 
 **Subject:** Patterns from building a DRA mutating webhook for GPU-NIC pairing — anyone else hitting these?
 
-We've been running a DRA admission webhook in production that pairs GPUs with RDMA NICs for LLM inference (prefill/decode disaggregation). Along the way we hit two operational problems that required non-obvious solutions, and we're curious if others building DRA webhooks have found better approaches.
+We've built a DRA admission webhook that pairs GPUs with RDMA NICs for LLM inference (prefill/decode disaggregation). Along the way we hit two operational problems that required non-obvious solutions, and we're curious if others building DRA webhooks have found better approaches.
 
 **Problem 1: Orphaned ResourceClaimTemplates.** Our webhook creates ResourceClaimTemplates during pod admission, then patches the pod to reference them. But the pod doesn't exist yet when the template is created, so there's no ownerReference — Kubernetes GC won't clean them up. We built a reconciler that detects unreferenced templates, annotates them with a timestamp, waits a grace period (to avoid racing the scheduler), and optionally auto-deletes. Is anyone else dealing with this? Is there a simpler approach we're missing?
 

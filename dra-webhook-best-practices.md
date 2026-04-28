@@ -2,7 +2,7 @@
 
 ## Introduction
 
-DRA mutating admission webhooks often need to create ResourceClaimTemplates or other cluster objects during pod admission, then patch the pod spec to reference them. Two operational challenges emerge at scale: orphaned resources that accumulate when pods fail or get deleted, and concurrent mutation races when multiple pods are admitted simultaneously. This document describes two battle-tested patterns that address these problems, drawn from production experience with GPU-NIC pairing workloads.
+DRA mutating admission webhooks often need to create ResourceClaimTemplates or other cluster objects during pod admission, then patch the pod spec to reference them. Two operational challenges emerge at scale: orphaned resources that accumulate when pods fail or get deleted, and concurrent mutation races when multiple pods are admitted simultaneously. This document describes two patterns that address these problems, drawn from building a GPU-NIC pairing webhook.
 
 ## Pattern 1: Orphan Cleanup Reconciler
 

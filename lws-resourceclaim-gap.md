@@ -60,7 +60,7 @@ Our webhook creates ResourceClaimTemplates at pod admission time — one claim p
 2. **Cross-replica coordination**: In a multi-replica LWS, the webhook has no visibility into what other replicas have claimed. The allocator's pending reservation TTL is a fragile workaround.
 3. **Pool-model allocation**: For workloads with fixed hardware pools (IMEX channels, licensed accelerators), the webhook's template-based approach doesn't fit — claims should be drawn from a pre-existing pool, not created on demand.
 
-KEP-5732 (Topology-Aware Scheduling) addresses device-level topology in the scheduler, but the workload-level gap (how LWS/JobSet distribute claims across replicas) sits above it. Both gaps need solving for production LLM inference.
+KEP-5732 (Topology-Aware Scheduling) addresses device-level topology in the scheduler, but the workload-level gap (how LWS/JobSet distribute claims across replicas) sits above it. Both gaps need solving for LLM inference workloads.
 
 ## Key Contacts
 

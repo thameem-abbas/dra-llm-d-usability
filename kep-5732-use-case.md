@@ -1,12 +1,12 @@
-# Use Case: Production GPU-NIC Topology-Aware Allocation via DRA Admission Webhook
+# Use Case: GPU-NIC Topology-Aware Allocation via DRA Admission Webhook
 
 ## Summary
 
-We operate a production Kubernetes mutating admission webhook that converts a synthetic resource request (`dra.llm-d.io/gpu-nic-pair: "N"`) into full DRA objects -- ResourceClaimTemplates with PCIe MatchAttribute constraints, NUMA co-location constraints, CEL-based rail selectors, and opaque driver parameters. The webhook exists because DRA's scheduler cannot express multi-device, cross-driver topology constraints. Every component -- NUMA-aware packing, PCIe root affinity, rail-aware NIC selection, pod affinity filtering, priority queue serialization, and pending reservation tracking -- is scheduler logic forced into an admission webhook. KEP-5732's Placement primitives would eliminate it.
+We've built a Kubernetes mutating admission webhook that converts a synthetic resource request (`dra.llm-d.io/gpu-nic-pair: "N"`) into full DRA objects -- ResourceClaimTemplates with PCIe MatchAttribute constraints, NUMA co-location constraints, CEL-based rail selectors, and opaque driver parameters. The webhook exists because DRA's scheduler cannot express multi-device, cross-driver topology constraints. Every component -- NUMA-aware packing, PCIe root affinity, rail-aware NIC selection, pod affinity filtering, priority queue serialization, and pending reservation tracking -- is scheduler logic forced into an admission webhook. KEP-5732's Placement primitives would eliminate it.
 
 ## Problem Statement
 
-Large-scale LLM inference (prefill/decode disaggregation) requires GPU-NIC pairs where the GPU and NIC share a PCIe root complex for RDMA. Beyond PCIe affinity, production deployments need:
+Large-scale LLM inference (prefill/decode disaggregation) requires GPU-NIC pairs where the GPU and NIC share a PCIe root complex for RDMA. Beyond PCIe affinity, these deployments need:
 
 - **NUMA locality**: Pairs within a single NUMA zone to avoid cross-socket memory traffic. An 8-GPU B200 node has two NUMA zones with 4 GPU-NIC pairs each; small requests must pack onto one zone, leaving the other zone available for large requests.
 - **Network rail isolation**: Each NIC must land on a distinct parallel network fabric. Rail collisions cause bandwidth contention and break collective communication.
@@ -70,4 +70,4 @@ We are asking for native scheduler support for multi-device, cross-driver topolo
 - **Cross-driver MatchAttribute**: MatchAttribute constraints that span device classes from different drivers within a Placement group.
 - **Beyond KEP-5004's scope**: KEP-5004 (Extended Resources Bridge, beta in v1.36) allows `resources.requests` syntax to trigger DRA claims via `extendedResourceName` in DeviceClass. However, it does not support CEL selectors, matchAttribute constraints, or multi-device pairing -- reinforcing that complex topology allocation still requires native Placement primitives.
 
-Our webhook is ~1500 lines of Go that would reduce to a ResourceClaimTemplate with the right Placement annotations. The code is open source at [openshift-psap/dra-admission-webhook](https://github.com/openshift-psap/dra-admission-webhook) and runs in production on multi-node B200 clusters with 8 GPU-NIC pairs per node.
+Our webhook is ~1500 lines of Go that would reduce to a ResourceClaimTemplate with the right Placement annotations. The code is open source at [openshift-psap/dra-admission-webhook](https://github.com/openshift-psap/dra-admission-webhook) and targets multi-node B200 clusters with 8 GPU-NIC pairs per node.

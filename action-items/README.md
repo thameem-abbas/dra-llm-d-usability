@@ -12,12 +12,12 @@ Reframed around three tracks: tack-on contributions to existing KEPs, one new KE
 
 ## Track 1: Tack-On Contributions (Highest ROI)
 
-### 1. KEP-5732: File production use case for intra-node DRA topology scheduling
+### 1. KEP-5732: File use case for intra-node DRA topology scheduling
 - **Status:** [ ] Not started
 - **Target:** [kubernetes/enhancements#5732](https://github.com/kubernetes/enhancements/issues/5732)
 - **Content:** [kep-5732-use-case.md](../kep-5732-use-case.md)
 - **Tags:** SIG-Scheduling, WG-Device-Management
-- **Why tack on:** KEP-5732's deferred DRA integration is exactly our gap. Our allocator.go (22 functions of topology logic) is production proof this is needed. Gaps in NUMA packing, PCIe affinity, batch mutation, and pending reservation tracking all collapse if the scheduler handles topology-aware DRA allocation natively.
+- **Why tack on:** KEP-5732's deferred DRA integration is exactly our gap. Our allocator.go (22 functions of topology logic) demonstrates this is needed. Gaps in NUMA packing, PCIe affinity, batch mutation, and pending reservation tracking all collapse if the scheduler handles topology-aware DRA allocation natively.
 - **Questions for upstream:**
   - Is DRA-aware topology scheduling planned for beta (v1.37)? What's the timeline?
   - Would our GPU-NIC pairing use case (cross-driver: `gpu.nvidia.com` + `dra.net`, PCIe root matching, NUMA co-location) be useful as a co-design test case?
@@ -85,27 +85,27 @@ Reframed around three tracks: tack-on contributions to existing KEPs, one new KE
 - **Status:** [ ] Not started
 - **Target:** `#sig-node` on Kubernetes Slack + `kubernetes-sig-node@googlegroups.com`
 - **Content:** [dra-webhook-best-practices.md](../dra-webhook-best-practices.md)
-- **Draft:** [04-sig-node-slack-message.md](drafts/04-sig-node-slack-message.md)
-- **Frame as:** Two patterns from production — orphan cleanup and batch mutation. Are others hitting these? Are there better approaches?
+- **Draft:** [06-sig-node-slack-message.md](drafts/06-sig-node-slack-message.md)
+- **Frame as:** Two patterns from building a DRA webhook — orphan cleanup and batch mutation. Are others hitting these? Are there better approaches?
 
 ### 7. SIG-Scheduling: Present topology allocation use case
 - **Status:** [ ] Not started
 - **Target:** [SIG-Scheduling meeting](https://github.com/kubernetes/community/tree/master/sig-scheduling)
 - **Format:** 5-minute slot
-- **Draft:** [05-sig-scheduling-talking-points.md](drafts/05-sig-scheduling-talking-points.md)
-- **Frame as:** Production evidence for KEP-5732 DRA integration + gauge interest in device availability query API (item 4)
+- **Draft:** [07-sig-scheduling-talking-points.md](drafts/07-sig-scheduling-talking-points.md)
+- **Frame as:** Concrete evidence for KEP-5732 DRA integration + gauge interest in device availability query API (item 4)
 
 ### 8. WG-Device-Management: KEP-5729 + per-replica claims + pool model
 - **Status:** [ ] Not started
 - **Target:** WG-Device-Management meeting
-- **Draft:** [13-wg-device-mgmt-talking-points.md](drafts/13-wg-device-mgmt-talking-points.md)
+- **Draft:** [08-wg-device-mgmt-talking-points.md](drafts/08-wg-device-mgmt-talking-points.md)
 - **Contacts:** @helayoty, @mortent (KEP-5729), @Edwinhr716 (LWS), @kannon92 (JobSet), @johnbelamaric
 - **Frame as:** KEP-5729 partially resolves the circular dependency. Two remaining gaps: per-replica unique claims and pool model. Who owns these?
 
 ### 9. KubeCon / DevConf talk proposal
 - **Status:** [ ] Not started
 - **Working title:** "Rail-Aware GPU-NIC Pairing with DRA: What the Scheduler Can't Do Yet"
-- **Draft:** [06-kubecon-abstract.md](drafts/06-kubecon-abstract.md)
+- **Draft:** [09-kubecon-abstract.md](drafts/09-kubecon-abstract.md)
 - **Action:** Check next KubeCon NA/EU CFP deadlines
 
 ---
@@ -125,7 +125,7 @@ Reframed around three tracks: tack-on contributions to existing KEPs, one new KE
 ### 11. File LWS pool-model issue (if needed)
 - **Status:** [ ] Not started — blocked on item 10
 - **Target:** [kubernetes-sigs/lws](https://github.com/kubernetes-sigs/lws/issues)
-- **Draft:** [12-lws-pool-model-issue.md](drafts/12-lws-pool-model-issue.md)
+- **Draft:** [11-lws-pool-model-issue.md](drafts/11-lws-pool-model-issue.md)
 
 ### 12. Evaluate interim workaround for per-replica claims
 - **Status:** [ ] Not started — blocked on item 10

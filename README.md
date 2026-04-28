@@ -1,6 +1,6 @@
 # DRA Usability: Upstream Engagement for llm-d
 
-Analysis of gaps between Kubernetes DRA (Dynamic Resource Allocation) and production LLM inference requirements — both at the device level (GPU-NIC topology) and the workload level (LWS/JobSet claim distribution). Tracks upstream KEP engagement and contributions.
+Analysis of gaps between Kubernetes DRA (Dynamic Resource Allocation) and LLM inference requirements — both at the device level (GPU-NIC topology) and the workload level (LWS/JobSet claim distribution). Tracks upstream KEP engagement and contributions.
 
 ## Context
 
@@ -16,7 +16,7 @@ This repo documents both layers of gaps, proposes upstream contributions, and tr
 
 | Document | Description |
 |----------|-------------|
-| [kep-5732-use-case.md](kep-5732-use-case.md) | Production use case for KEP-5732 (Topology-Aware Scheduling) — our webhook IS the motivating example |
+| [kep-5732-use-case.md](kep-5732-use-case.md) | Use case for KEP-5732 (Topology-Aware Scheduling) — our webhook IS the motivating example |
 | [kep-5491-feedback.md](kep-5491-feedback.md) | Consumer feedback on KEP-5491 (List-Typed Attributes) — scalar-to-list migration concerns for pcieRoot/numaNode |
 | [cel-selector-patterns.md](cel-selector-patterns.md) | Three reusable CEL selector patterns: rail-specific RDMA, explicit device pinning, cross-driver topology alignment |
 | [dra-webhook-best-practices.md](dra-webhook-best-practices.md) | Two operational patterns: orphan cleanup reconciler and priority queue batch mutation |

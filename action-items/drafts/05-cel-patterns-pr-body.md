@@ -19,7 +19,7 @@ docs: Add CEL device selector patterns for DRA cross-driver topology
 
 ## Summary
 
-- Add three production-tested CEL selector patterns for DRA device allocation
+- Add three reusable CEL selector patterns for DRA device allocation
 - Patterns cover: rail-specific RDMA selection, explicit device pinning with defensive guards, and cross-driver topology alignment via `matchAttribute` + CEL
 - All examples use `resource.k8s.io/v1` API with `exactly` sub-field
 
@@ -31,7 +31,7 @@ The current DRA documentation has basic CEL examples but doesn't cover:
 - Rail-specific RDMA selection using `startsWith` for subnet prefix matching
 - Composing multiple patterns (PCIe pairing + rail selection + NUMA co-location)
 
-These patterns come from a production webhook and are reusable by anyone building DRA-based device allocation.
+These patterns come from a DRA admission webhook built for GPU-NIC pairing and are reusable by anyone building DRA-based device allocation.
 
 ## Content
 

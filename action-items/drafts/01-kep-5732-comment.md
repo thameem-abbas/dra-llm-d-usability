@@ -8,9 +8,9 @@
 
 ## Comment Body
 
-### Production Use Case: GPU-NIC Topology-Aware Allocation via DRA Admission Webhook
+### Use Case: GPU-NIC Topology-Aware Allocation via DRA Admission Webhook
 
-We're running a production mutating admission webhook for LLM inference workloads that reimplements several scheduler-level concerns in admission — specifically because DRA-aware topology scheduling isn't available yet. Sharing our experience as a concrete use case for KEP-5732's beta work, particularly the DRA integration that was deferred from v1.36 alpha.
+We've built a mutating admission webhook for LLM inference workloads that reimplements several scheduler-level concerns in admission — specifically because DRA-aware topology scheduling isn't available yet. Sharing as a concrete use case for KEP-5732's beta work, particularly the DRA integration that was deferred from v1.36 alpha.
 
 **What we do:** Convert a synthetic resource request (`dra.llm-d.io/gpu-nic-pair: "N"`) into full DRA objects — ResourceClaimTemplates with per-pair device requests, PCIe `matchAttribute` constraints, NUMA co-location constraints, CEL-based rail selectors, and opaque NIC driver parameters. The webhook coordinates two independent DRA drivers (`gpu.nvidia.com` and `dra.net`) that have no awareness of each other.
 
