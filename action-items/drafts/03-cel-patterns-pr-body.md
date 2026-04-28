@@ -1,8 +1,12 @@
 # Draft: kubernetes/website PR for CEL Patterns
 
 **Target:** https://github.com/kubernetes/website
-**Action:** User opens PR (I can prep the fork/branch, user reviews before pushing)
-**Status:** Ready for review
+**Action:** User opens PR from prepared branch
+**Status:** Branch ready for review
+**Fork:** https://github.com/thameem-abbas/website
+**Branch:** `docs/dra-cel-selector-patterns`
+**File:** `content/en/docs/concepts/scheduling-eviction/dra-cel-selector-patterns.md`
+**Create PR:** https://github.com/thameem-abbas/website/pull/new/docs/dra-cel-selector-patterns
 **Note:** Check with SIG-Docs and #sig-node first (item 4) to confirm there's no existing effort and the right location.
 
 ---
