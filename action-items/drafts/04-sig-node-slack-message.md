@@ -16,7 +16,7 @@ We've been running a DRA admission webhook in production that pairs GPUs with RD
 
 **Problem 2: Rail collisions under concurrent admission.** When a Deployment rolls out N replicas simultaneously, N admission requests hit the webhook at once. Without coordination, multiple pods grab the same network rail. We added a debounce-batch-serialize pipeline (collect requests for 3s, sort by resource demand, process largest-first). This feels like the wrong layer — is there a scheduler plugin or DRA mechanism that handles this?
 
-We also noticed KEP-5517 (ResourcePoolStatusRequest, alpha in v1.36) — it looks like it could replace our direct ResourceSlice scanning for preflight checks. Has anyone tried it?
+We also noticed KEP-5729 (ResourceClaim Support for Workloads, alpha in v1.36) adds ResourceClaimTemplates to PodGroups — this looks like it addresses the LWS/JobSet claim lifecycle gap. Has anyone tried it with multi-device DRA claims?
 
 Wrote up both patterns in detail: https://github.com/thameem-abbas/dra-llm-d-usability/blob/main/dra-webhook-best-practices.md
 

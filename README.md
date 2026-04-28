@@ -39,21 +39,22 @@ Features this webhook implements that upstream DRA doesn't support (yet):
 6. **Replica-level ResourceClaim sharing** — LWS leader + workers in a replica can't share claims ([LWS #444](https://github.com/kubernetes-sigs/lws/issues/444) stalled)
 7. **Finite-pool claim distribution** — no mechanism to distribute pre-existing claims across replicas and reclaim on scale-down (not covered anywhere)
 8. **Cross-replica claim coordination** — no workload-level view of which replicas hold which claims
-9. **Workload API + DRA integration** — KEP #5488 (unified solution) closed with no replacement; everyone "waiting on Workload API" but Workload API has no ResourceClaim story
+9. **Workload API + DRA integration** — KEP #5488 (unified solution) closed, but KEP-5729 (ResourceClaim Support for Workloads) is now alpha in v1.36. Covers shared claims per PodGroup but not per-replica unique claims.
 
 ## KEP Alignment (as of Kubernetes v1.36, April 2026)
 
 | KEP | Status | Relationship |
 |-----|--------|-------------|
 | KEP-4381 (DRA Core) | GA v1.34 | Foundation — webhook uses v1 API with `Exactly` sub-field |
-| KEP-5732 (Topology-Aware Scheduling) | Alpha v1.36 | DRA integration deferred to beta — our webhook fills this gap |
-| KEP-5491 (List Type Attributes) | Alpha v1.36 | Would improve our pcieRoot/numaNode MatchAttribute constraints |
-| KEP-4816 (Prioritized Alternatives) | GA v1.36 | Could replace custom rail fallback logic |
-| KEP-5055 (Device Taints) | Beta v1.36 | Could simplify preflight availability checking |
-| KEP-5007 (Binding Conditions) | Beta v1.36 | Could replace preflight "graceful degradation" pattern |
-| KEP-5517 (ResourcePoolStatusRequest) | Alpha v1.36 | Could replace direct ResourceSlice scanning in preflight |
+| KEP-5732 (Topology-Aware Scheduling) | Alpha v1.36 | Multi-pod placement (rack/pool level) — complementary to our intra-node device pairing, DRA integration deferred to beta |
+| KEP-5491 (List Type Attributes) | Alpha v1.36 | Forward-compatible with our pcieRoot/numaNode MatchAttribute constraints — enables matching against devices with multi-valued topology attributes |
+| ~~KEP-4816 (Prioritized Alternatives)~~ | GA v1.36 | ~~Not applicable — solves per-pod fallback, not coordinated cross-pod rail assignment~~ |
+| ~~KEP-5055 (Device Taints)~~ | Beta v1.36 | ~~Not applicable — taints mark health/maintenance, our preflight checks allocation state not device health~~ |
+| ~~KEP-5007 (Binding Conditions)~~ | Beta v1.36 | ~~Not applicable — post-allocation device readiness, our preflight is pre-allocation capacity checking~~ |
+| ~~KEP-5517 (Node Allocatable Resources)~~ | Alpha v1.36 | ~~Misidentified — solves scheduler double-counting of CPU/memory between DRA and pod.spec.resources, not a device availability query API~~ |
 | KEP-5004 (Extended Resources Bridge) | Beta v1.36 | Simple DRA path — does NOT cover our multi-device topology use case |
-| KEP-6012 (CompositePodGroup) | Open, targeting Alpha v1.37 | Most promising vehicle for per-replica ResourceClaim scoping — too early to tell |
+| KEP-5729 (ResourceClaim Support for Workloads) | Alpha v1.36 | Directly addresses LWS/JobSet ResourceClaim gap — shared claim per PodGroup, but not per-replica unique claims |
+| KEP-6012 (CompositePodGroup) | Open, targeting Alpha v1.37 (WIP) | Hierarchical scheduling grouping — ResourceClaim scoping delegated to KEP-5729, no direct DRA integration in this KEP |
 | KEP-5488 (Multi-host DRA UX) | **Closed** (April 2026) | Was the unified solution for workload-level DRA. Dead, no replacement. |
 | LWS #444 (ResourceClaimTemplate) | Open, stalled | Template model for LWS — deferred to Workload API that has no ResourceClaim story |
 | JobSet #762 (Job-level ResourceClaimTemplate) | Open, rotting | Same gap for JobSet — also deferred to Workload API |

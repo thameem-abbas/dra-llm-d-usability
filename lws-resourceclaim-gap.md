@@ -36,19 +36,21 @@ A fixed number of pre-existing ResourceClaims (e.g., 4 IMEX channels, 8 TPU slic
 |-------------|--------|------------------------|
 | **LWS #444** (ResourceClaimTemplate) | Open, unassigned, stalled | Direct — template model for LWS. Deferred to Workload API. |
 | **JobSet #762** (Job-level ResourceClaimTemplate) | Open, rotting | Same gap for JobSet. Also deferred to Workload API. |
-| **KEP #5488** (Multi-host DRA UX) | **Closed** (triage bot, April 2026) | Was the closest unified solution. Dead, no replacement. |
+| **KEP #5729** (ResourceClaim Support for Workloads) | **Alpha v1.36** | Adds ResourceClaimTemplates to PodGroup — shared claim per group, not per replica. Template model only. Directly targets LWS/JobSet gap. |
+| **KEP #5488** (Multi-host DRA UX) | **Closed** (triage bot, April 2026) | Was the closest unified solution. KEP-5729 now covers the ResourceClaim lifecycle portion. |
 | **KEP #4671** (Gang Scheduling / Workload API) | Alpha v1.35-1.36 | **None** — explicitly excludes ResourceClaims. Scheduling only. |
-| **KEP #6012** (CompositePodGroup) | Open, targeting Alpha v1.37 | Unknown — too early. Most promising vehicle for per-replica claim scoping. |
+| **KEP #6012** (CompositePodGroup) | Open, targeting Alpha v1.37 (WIP) | Hierarchical scheduling grouping — delegates ResourceClaim scoping to KEP-5729. |
 | **k/k #132192** (Workload-aware scheduling) | Open, active | Umbrella initiative. No concrete ResourceClaim design. |
 
-### The Circular Dependency
+### The Circular Dependency (Partially Resolved)
 
 1. LWS #444 deferred → "waiting on Workload API for ResourceClaim support"
 2. Workload API (KEP #4671) → explicitly excludes ResourceClaims
 3. KEP #5488 (the bridge) → dead
-4. KEP #6012 (CompositePodGroup) → too early, no ResourceClaim story yet
+4. **KEP #5729** (ResourceClaim Support for Workloads) → **Alpha v1.36, active.** Adds ResourceClaimTemplates to PodGroup. Solves shared-claim-per-group (template model). Does NOT solve per-replica unique claims or pool model.
+5. KEP #6012 (CompositePodGroup) → hierarchical grouping, delegates ResourceClaim work to KEP-5729
 
-**Translation**: Everyone is waiting on an upstream solution that doesn't exist and may not materialize for 2+ release cycles (late 2027 at earliest).
+**Update**: KEP-5729 breaks the circular dependency for the template model. LWS/JobSet can use PodGroup-level ResourceClaimTemplates instead of implementing claim lifecycle themselves. However, our use case needs per-replica unique claims (each pod gets its own GPU-NIC pair), not a shared claim across the group. The pool model remains unaddressed.
 
 ## Connection to DRA Admission Webhook
 

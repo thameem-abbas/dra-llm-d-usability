@@ -19,7 +19,7 @@ We'll walk through a production DRA admission webhook that fills this gap for LL
 We'll cover three things the audience can take away:
 1. **CEL selector patterns** for cross-driver device pairing that go beyond upstream examples — rail-specific RDMA selection, explicit device pinning, and the three-part guard idiom for defensive attribute checking.
 2. **Operational patterns** for DRA webhooks at scale — orphan cleanup for ResourceClaimTemplates without ownerReferences, and priority queue batching to prevent rail collisions during concurrent rollouts.
-3. **Where upstream is headed** — how KEP-5732 (Topology-Aware Scheduling), KEP-5491 (List-Typed Attributes), and KEP-4816 (Prioritized Alternatives) will eventually move this logic into the scheduler, and what's still missing.
+3. **Where upstream is headed** — how KEP-5732 (Topology-Aware Scheduling) and KEP-5491 (List-Typed Attributes) will eventually move this logic into the scheduler, and what's still missing.
 
 This talk is for platform engineers building DRA-based device allocation and anyone interested in the gap between DRA's API and production multi-device topology requirements.
 
