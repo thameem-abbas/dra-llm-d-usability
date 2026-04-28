@@ -13,7 +13,7 @@ Reframed around three tracks: tack-on contributions to existing KEPs, one new KE
 ## Track 1: Tack-On Contributions (Highest ROI)
 
 ### 1. KEP-5732: File use case for intra-node DRA topology scheduling
-- **Status:** [ ] Not started
+- **Status:** [x] Posted
 - **Target:** [kubernetes/enhancements#5732](https://github.com/kubernetes/enhancements/issues/5732)
 - **Content:** [kep-5732-use-case.md](../kep-5732-use-case.md)
 - **Tags:** SIG-Scheduling, WG-Device-Management
@@ -22,10 +22,10 @@ Reframed around three tracks: tack-on contributions to existing KEPs, one new KE
   - Is DRA-aware topology scheduling planned for beta (v1.37)? What's the timeline?
   - Would our GPU-NIC pairing use case (cross-driver: `gpu.nvidia.com` + `dra.net`, PCIe root matching, NUMA co-location) be useful as a co-design test case?
   - Our batch mutation and pending reservation patterns exist because admission webhooks lack the scheduler's global view — does KEP-5732 aim to eliminate this class of workaround?
-- **Upstream link:** _(fill when posted)_
+- **Upstream link:** https://github.com/kubernetes/enhancements/issues/5732#issuecomment-4337498195
 
 ### 2. KEP-5729: Does per-PodGroup ResourceClaim extend to per-replica unique claims?
-- **Status:** [ ] Not started
+- **Status:** [x] Posted
 - **Target:** [kubernetes/enhancements#5729](https://github.com/kubernetes/enhancements/issues/5729)
 - **Contacts:** @helayoty, @mortent, @nojnhuh (KEP-5729 authors)
 - **Why tack on:** KEP-5729 (Alpha v1.36) adds ResourceClaimTemplates to PodGroup — shared claim per group. Our use case needs per-replica unique claims (each pod gets its own GPU-NIC pair). This is a natural extension of the same API surface and controller.
@@ -34,10 +34,10 @@ Reframed around three tracks: tack-on contributions to existing KEPs, one new KE
   - If per-replica: does the naming scheme support deterministic per-replica references?
   - Is pool model (finite pre-existing claims distributed across replicas, reclaimed on scale-down) in scope for KEP-5729, or does it need a separate proposal?
   - Does KEP-5729 satisfy LWS #444 and JobSet #762, or do those issues need additional work?
-- **Upstream link:** _(fill when posted)_
+- **Upstream link:** https://github.com/kubernetes/enhancements/issues/5729#issuecomment-4337498700
 
 ### 3. KEP-5491: Consumer feedback on scalar-to-list attribute transition
-- **Status:** [ ] Not started
+- **Status:** [x] Posted
 - **Target:** [kubernetes/enhancements#5491](https://github.com/kubernetes/enhancements/issues/5491)
 - **Content:** [kep-5491-feedback.md](../kep-5491-feedback.md)
 - **Why tack on:** Our webhook uses `matchAttribute` on scalar `pcieRoot` and `numaNode`. KEP-5491 changes MatchAttribute semantics to set intersection. Forward-compatible for us, but our preflight code reads ResourceSlices directly and assumes scalar extraction.
@@ -45,7 +45,7 @@ Reframed around three tracks: tack-on contributions to existing KEPs, one new KE
   - What's the recommended Go pattern for consumers reading attributes that may be scalar or list?
   - Should new CEL selectors use `.includes()` even when the attribute is currently scalar, as future-proofing?
   - When a driver migrates an attribute from scalar to list, should it publish both fields for backward compatibility?
-- **Upstream link:** _(fill when posted)_
+- **Upstream link:** https://github.com/kubernetes/enhancements/issues/5491#issuecomment-4337499390
 
 ---
 
