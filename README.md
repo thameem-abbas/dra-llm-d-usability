@@ -1,12 +1,16 @@
-# DRA Usability: Upstream Engagement for llm-d GPU-NIC Pairing
+# DRA Usability: Upstream Engagement for llm-d
 
-Analysis of gaps between Kubernetes DRA (Dynamic Resource Allocation) and production GPU-NIC pairing requirements for LLM inference workloads. Tracks upstream KEP engagement and contributions.
+Analysis of gaps between Kubernetes DRA (Dynamic Resource Allocation) and production LLM inference requirements — both at the device level (GPU-NIC topology) and the workload level (LWS/JobSet claim distribution). Tracks upstream KEP engagement and contributions.
 
 ## Context
 
-The [dra-admission-webhook](https://github.com/openshift-psap/dra-rail-admission-webhook) converts a synthetic resource request (`dra.llm-d.io/gpu-nic-pair: "N"`) into full DRA objects — ResourceClaimTemplates with CEL selectors, PCIe MatchAttribute constraints, NUMA co-location, and rail-aware NIC allocation. Much of this is scheduler-level work done in an admission webhook because upstream DRA doesn't support topology-aware multi-device allocation yet.
+Two layers of DRA gaps affect LLM inference workloads:
 
-This repo documents the gaps, proposes upstream contributions, and tracks progress.
+**Device layer**: The [dra-admission-webhook](https://github.com/openshift-psap/dra-rail-admission-webhook) converts a synthetic resource request (`dra.llm-d.io/gpu-nic-pair: "N"`) into full DRA objects — ResourceClaimTemplates with CEL selectors, PCIe MatchAttribute constraints, NUMA co-location, and rail-aware NIC allocation. Much of this is scheduler-level work done in an admission webhook because upstream DRA doesn't support topology-aware multi-device allocation yet.
+
+**Workload layer**: LeaderWorkerSet (LWS) — the workload construct for prefill/decode disaggregation — has no ResourceClaim support. The upstream path to workload-level DRA integration is fragmented and stalled, with the closest unified solution (KEP #5488) closed with no replacement.
+
+This repo documents both layers of gaps, proposes upstream contributions, and tracks progress.
 
 ## Gap Analysis
 
@@ -16,8 +20,11 @@ This repo documents the gaps, proposes upstream contributions, and tracks progre
 | [kep-5491-feedback.md](kep-5491-feedback.md) | Consumer feedback on KEP-5491 (List-Typed Attributes) — scalar-to-list migration concerns for pcieRoot/numaNode |
 | [cel-selector-patterns.md](cel-selector-patterns.md) | Three reusable CEL selector patterns: rail-specific RDMA, explicit device pinning, cross-driver topology alignment |
 | [dra-webhook-best-practices.md](dra-webhook-best-practices.md) | Two operational patterns: orphan cleanup reconciler and priority queue batch mutation |
+| [lws-resourceclaim-gap.md](lws-resourceclaim-gap.md) | LWS has no ResourceClaim support — template model stalled, pool model not covered anywhere upstream |
 
 ## Upstream Gaps Summary
+
+### Device Layer (DRA Admission Webhook)
 
 Features this webhook implements that upstream DRA doesn't support (yet):
 
@@ -26,6 +33,13 @@ Features this webhook implements that upstream DRA doesn't support (yet):
 3. **Cluster-level pending reservation tracking** — no coordination mechanism for admission webhooks
 4. **Orphan resource cleanup** — no built-in GC for webhook-created DRA objects without ownerReferences
 5. **Explicit device pairing mode** — no "admin declares exact device sets" pattern in DRA
+
+### Workload Layer (LWS / JobSet)
+
+6. **Replica-level ResourceClaim sharing** — LWS leader + workers in a replica can't share claims ([LWS #444](https://github.com/kubernetes-sigs/lws/issues/444) stalled)
+7. **Finite-pool claim distribution** — no mechanism to distribute pre-existing claims across replicas and reclaim on scale-down (not covered anywhere)
+8. **Cross-replica claim coordination** — no workload-level view of which replicas hold which claims
+9. **Workload API + DRA integration** — KEP #5488 (unified solution) closed with no replacement; everyone "waiting on Workload API" but Workload API has no ResourceClaim story
 
 ## KEP Alignment (as of Kubernetes v1.36, April 2026)
 
@@ -39,6 +53,10 @@ Features this webhook implements that upstream DRA doesn't support (yet):
 | KEP-5007 (Binding Conditions) | Beta v1.36 | Could replace preflight "graceful degradation" pattern |
 | KEP-5517 (ResourcePoolStatusRequest) | Alpha v1.36 | Could replace direct ResourceSlice scanning in preflight |
 | KEP-5004 (Extended Resources Bridge) | Beta v1.36 | Simple DRA path — does NOT cover our multi-device topology use case |
+| KEP-6012 (CompositePodGroup) | Open, targeting Alpha v1.37 | Most promising vehicle for per-replica ResourceClaim scoping — too early to tell |
+| KEP-5488 (Multi-host DRA UX) | **Closed** (April 2026) | Was the unified solution for workload-level DRA. Dead, no replacement. |
+| LWS #444 (ResourceClaimTemplate) | Open, stalled | Template model for LWS — deferred to Workload API that has no ResourceClaim story |
+| JobSet #762 (Job-level ResourceClaimTemplate) | Open, rotting | Same gap for JobSet — also deferred to Workload API |
 
 ## Action Items
 
