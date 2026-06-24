@@ -137,6 +137,12 @@ Recent upstream activity:
     Legend:  ──▶ depends on    ─ ─▶ relates to    ╳ dead
 ```
 
+## Auxiliary Items
+
+| Document | Description |
+|----------|-------------|
+| [NRI Plugin Explainer](auxiliary-items/nri-plugin-explainer.md) | What the NRI (Node Resource Interface) plugin does in DRANET, why CDI alone isn't enough, the dual-hook architecture, timeout configuration, and how it works with the composite driver |
+
 ## Action Items
 
 See [action-items/](action-items/) for tracked upstream engagement tasks.
