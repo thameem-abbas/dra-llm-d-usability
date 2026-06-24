@@ -1,100 +1,115 @@
 # DRA GPU-NIC Pairing: Quick Start for Application Users
 
-This page covers everything you need to request GPU-NIC pairs for your workloads. The DRA admission webhook handles topology, rail selection, and NUMA placement automatically. You configure your pod spec; the webhook and scheduler do the rest.
+This page covers everything you need to request GPU-NIC pairs for your workloads. The [composite DRA driver](https://github.com/openshift-psap/composite-dra-driver) handles topology pairing, rail configuration, and driver delegation automatically. You configure your pod spec; the composite driver and scheduler do the rest.
 
 ## Requesting GPU-NIC Pairs
 
-Add a resource request to your pod (or pod template in a Deployment, Job, etc.):
+Add a resource request to your pod (or pod template in a Deployment, Job, LWS, etc.):
 
 ```yaml
 apiVersion: v1
 kind: Pod
 metadata:
   name: my-inference-pod
-  namespace: my-namespace    # namespace must have webhook label (see below)
 spec:
   containers:
     - name: inference
       image: my-image
       resources:
         requests:
-          composite.dra.io/gpu-nic-pair: "4"   # previously: dra.llm-d.io/gpu-nic-pair (webhook approach)
+          composite.dra.io/gpu-nic-pair: "4"
 ```
 
-That's it. The webhook intercepts this request and generates the DRA objects (ResourceClaimTemplates, CEL selectors, matchAttribute constraints) needed to allocate 4 GPU-NIC pairs with correct PCIe topology. Your pod will get 4 GPUs, each paired with an RDMA NIC on the same PCIe root complex.
+The composite driver publishes pre-paired GPU-NIC devices in ResourceSlices. The scheduler allocates from these natively — no webhook, no admission-time decisions. Your pod gets 4 GPUs, each paired with an RDMA NIC on the same PCIe root complex, with per-rail network configuration resolved automatically.
+
+### How it works under the hood
+
+1. The composite driver watches GPU and NIC ResourceSlices on each node
+2. It pairs devices by `matchAttribute` on `resource.kubernetes.io/pcieRoot`
+3. It publishes composite ResourceSlices (8 GPU-NIC pairs per 8-GPU node)
+4. The scheduler allocates composite devices to your pod
+5. At prepare time, the driver resolves per-rail routing config and delegates to the underlying GPU and NIC drivers
 
 ### Common pair counts
 
 | Pairs | What you get |
 |-------|-------------|
 | `"1"` | 1 GPU + 1 NIC on the same PCIe root |
-| `"2"` | 2 pairs, packed into one NUMA zone |
-| `"4"` | 4 pairs, fills one NUMA zone |
-| `"8"` | 8 pairs, entire node (both NUMA zones) |
+| `"2"` | 2 pairs |
+| `"4"` | 4 pairs (fills one NUMA zone on typical 8-GPU nodes) |
+| `"8"` | 8 pairs (entire node) |
 
-The webhook handles NUMA bin-packing: small requests pack into one zone to leave the other zone available for larger requests.
+## How the Resource Request Maps to DRA
 
-## Namespace Label
+**Kubernetes 1.36+** with the `DRAExtendedResource` feature gate: `composite.dra.io/gpu-nic-pair` maps directly to the composite DRA driver via a DeviceClass. The scheduler handles it natively — no webhook needed.
 
-Your namespace must be labeled for the webhook to process pods:
+**Kubernetes < 1.36**: A mutating webhook (included in the composite driver Helm chart) intercepts the synthetic resource, creates the appropriate ResourceClaimTemplate, and patches the pod. This is a temporary bridge.
 
-```
-dra.llm-d.io/webhook-enabled: "true"
-```
-
-Pods in unlabeled namespaces are not intercepted.
-
-## Extended Resource Mode
-
-If your workload uses standard GPU resource requests (`nvidia.com/gpu`), the webhook can intercept those too. This is useful during migration from device plugins to DRA:
-
-```yaml
-resources:
-  requests:
-    nvidia.com/gpu: "2"
-```
-
-The `/mutate-ext` endpoint converts this to DRA ResourceClaims automatically. This works in all non-system namespaces without the label requirement. Each container gets claim references only for the GPUs it requested.
-
-**Note:** A pod cannot request both `composite.dra.io/gpu-nic-pair` and `nvidia.com/gpu`. Use one or the other.
+**A pod cannot request both `composite.dra.io/gpu-nic-pair` and `nvidia.com/gpu`.** Use one or the other. The composite driver already includes the GPU in each pair.
 
 ## What You Get
 
-When the webhook processes your pod, each GPU-NIC pair is guaranteed:
+Each GPU-NIC pair is guaranteed:
 
 - **PCIe root affinity** — GPU and NIC share the same PCIe root complex for optimal RDMA bandwidth
-- **Rail assignment** — each NIC lands on a distinct network rail (subnet), preventing bandwidth contention
-- **NUMA locality** — pairs are packed into the fewest NUMA zones possible
+- **Per-rail network config** — routing tables, gateways, MTU, and policy routes are resolved per-NIC at prepare time based on which rail the NIC is on
+- **Rail diversity** — DRA naturally allocates distinct NICs, so each NIC lands on a different rail
 
-You don't need to understand ResourceClaims, CEL selectors, or matchAttribute constraints to use this. The webhook generates all of it from your pair count.
+You don't need to understand ResourceClaims, CEL selectors, or matchAttribute constraints. The composite driver generates and manages all DRA objects internally.
+
+## Installation
+
+The composite driver deploys as a DaemonSet via Helm chart:
+
+```bash
+helm install composite-dra-driver oci://ghcr.io/openshift-psap/composite-dra-driver/charts/composite-dra-driver \
+  --namespace composite-dra-driver --create-namespace
+```
+
+Prerequisites:
+- NVIDIA GPU DRA driver (`gpu.nvidia.com`) running on GPU nodes
+- DRANET (`dra.net`) or DRA SR-IOV driver running on GPU nodes
+- Kubernetes v1.34+ (DRA GA)
+- Container runtime with CDI support (containerd v1.7+, CRI-O v1.28+)
+- CRI-O NRI plugin timeout increased to 30s+ on GPU worker nodes (see [NRI Plugin Explainer](../auxiliary-items/nri-plugin-explainer.md))
 
 ## Verifying Your Allocation
 
-After your pod is running, check what was allocated:
+After your pod is running:
 
 ```bash
-# See the ResourceClaimTemplates created for your pod
-kubectl get resourceclaimtemplates -n my-namespace -l app.kubernetes.io/managed-by=dra-gpu-nic-webhook
+# See composite ResourceSlices on a node
+kubectl get resourceslices -l driver=composite.dra.io
 
-# See the bound ResourceClaims
-kubectl get resourceclaims -n my-namespace
+# See ResourceClaims for your pod
+kubectl get resourceclaims -n <namespace>
 
 # Check a specific claim's allocation details
-kubectl get resourceclaim <claim-name> -n my-namespace -o yaml
+kubectl get resourceclaim <claim-name> -n <namespace> -o yaml
+
+# See shadow claims created by the composite driver
+kubectl get resourceclaims -n <namespace> -l app.kubernetes.io/managed-by=composite-dra-driver
 ```
 
-The claim's `status.allocation` shows which specific GPU and NIC devices were allocated and on which node.
+The composite claim's `status.allocation` shows which composite devices were allocated. Shadow claims show the underlying GPU and NIC allocations with per-device opaque parameters.
 
 ## Troubleshooting
 
 **Pod stuck in Pending:**
-- Check that the namespace has the `dra.llm-d.io/webhook-enabled: "true"` label
-- Check webhook logs: `kubectl logs -n <webhook-namespace> -l app=dra-gpu-nic-webhook`
-- Verify enough GPU-NIC pairs are available: check ResourceSlices for node capacity
+- Check that composite ResourceSlices exist: `kubectl get resourceslices -l driver=composite.dra.io`
+- Check composite driver logs: `kubectl logs -n composite-dra-driver -l app=composite-dra-driver`
+- Verify underlying drivers are publishing ResourceSlices: `kubectl get resourceslices` (should see slices from `gpu.nvidia.com` and `dra.net`)
+- On K8s < 1.36: verify the webhook is running and the `DRAExtendedResource` feature gate is not expected
 
-**Pod scheduled but NIC performance is poor:**
-- Verify PCIe pairing: check the ResourceClaim allocation to confirm GPU and NIC share a pcieRoot value
-- Check CRI-O NRI plugin timeout: multi-VF RDMA operations require `nri_plugin_request_timeout: 60s` on GPU worker nodes. Without this, the NRI plugin may crash during device setup.
+**Pod scheduled but NIC not configured correctly:**
+- Check shadow claim status: look for `NetworkDeviceReady` and `RDMALinkReady` conditions
+- Verify CRI-O NRI plugin timeout: multi-VF RDMA operations require `nri_plugin_request_timeout: 30s` on GPU worker nodes. Without this, the NRI plugin may crash during device setup. See [NRI Plugin Explainer](../auxiliary-items/nri-plugin-explainer.md).
+- Check DRANET logs for NIC netns move errors
+
+**Composite driver not publishing ResourceSlices:**
+- Verify underlying drivers are running and publishing their own ResourceSlices
+- Check composite driver ConfigMap for correct driver names and constraint config
+- Check composite driver logs for pairing errors
 
 ## Further Reading
 
@@ -103,4 +118,6 @@ For details on what happens under the hood:
 - [What Is DRA?](01-what-is-dra.md) — fundamentals of Dynamic Resource Allocation
 - [How DRA Works](02-how-dra-works.md) — object model, scheduler lifecycle, CEL selectors
 - [GPU DRA Drivers](03-gpu-dra-drivers.md) — NVIDIA, AMD, Intel driver details
-- [NIC DRA Drivers and Topology](04-nic-dra-drivers.md) — DRANET, GPU-NIC pairing mechanics, the webhook in depth
+- [NIC DRA Drivers and Topology](04-nic-dra-drivers.md) — DRANET, GPU-NIC pairing mechanics, composite driver architecture
+- [NRI Plugin Explainer](../auxiliary-items/nri-plugin-explainer.md) — what DRANET's NRI plugin does and the timeout configuration
+- [DRA + llm-d: RoCE Challenges](../dra-roce-challenges.md) — remaining gaps and upstream KEP tracking

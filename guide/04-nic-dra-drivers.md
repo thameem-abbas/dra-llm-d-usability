@@ -1,6 +1,6 @@
 # NIC DRA Drivers and GPU-NIC Topology
 
-This is the fourth and final document in a reading guide about Kubernetes Dynamic Resource Allocation (DRA). If you have not already read the first three documents, start with `01-what-is-dra.md` (concepts), `02-how-dra-works.md` (object model and lifecycle), and `03-gpu-dra-drivers.md` (GPU drivers). This document covers NIC DRA drivers, the GPU-NIC topology pairing problem, and a real-world webhook use case that illustrates where the DRA scheduler currently hits its limits.
+This is the fourth and final document in a reading guide about Kubernetes Dynamic Resource Allocation (DRA). If you have not already read the first three documents, start with `01-what-is-dra.md` (concepts), `02-how-dra-works.md` (object model and lifecycle), and `03-gpu-dra-drivers.md` (GPU drivers). This document covers NIC DRA drivers, the GPU-NIC topology pairing problem, and the composite DRA driver that makes cross-driver topology pairing transparent to workload authors.
 
 ## Why NICs Need DRA
 
@@ -216,73 +216,90 @@ spec:
 
 This claim requests two GPU-NIC pairs. The first two constraints ensure each pair shares a PCIe root. The third constraint ensures both NICs (and by transitive topology, both GPUs) are in the same NUMA zone. The scheduler allocates devices that satisfy all constraints.
 
-## Real-World Example: The DRA Admission Webhook
+## Composite DRA Driver: Simplifying GPU-NIC Pairing
 
-This section frames an admission webhook as a teaching example. The webhook handles LLM inference workloads that need multiple GPU-NIC pairs with topology constraints. It shows where the DRA scheduler currently hits its limits and what real-world topology demands look like.
+The claims above work for InfiniBand — `matchAttribute` on `pcieRoot` is all that's needed, and DRANET handles the rest. RoCE introduces a harder problem: each rail requires distinct network configuration (routing table, gateway, MTU, policy routes) that depends on which specific NIC gets allocated. DRA's opaque driver parameters are set at claim creation time, before the scheduler picks a device. There is no mechanism to parameterize config based on the actual allocation outcome.
+
+The [composite DRA driver](https://github.com/openshift-psap/composite-dra-driver) solves this by operating as a native DRA driver between the underlying drivers and the scheduler.
 
 ### What It Does
 
-The DRA admission webhook is a mutating admission webhook built for LLM inference workloads. A user requests GPU-NIC pairs with a simple annotation:
+The composite driver runs as a DaemonSet on each node. It:
+
+1. **Watches** underlying ResourceSlices from `gpu.nvidia.com` and `dra.net`
+2. **Pairs** devices by `matchAttribute` on `pcieRoot` (config-driven, not hardcoded)
+3. **Publishes** composite ResourceSlices — 8 GPU-NIC pair devices per 8-GPU node
+4. **Prepares** allocated devices by resolving per-rail network config and delegating to underlying drivers via gRPC shadow claims
+
+The scheduler sees composite devices as normal allocatable resources. Users request them with standard resource syntax:
 
 ```yaml
 resources:
   requests:
-    composite.dra.io/gpu-nic-pair: "4"   # previously: dra.llm-d.io/gpu-nic-pairs annotation (webhook approach)
+    composite.dra.io/gpu-nic-pair: "4"
 ```
 
-The webhook intercepts the pod CREATE request and generates full DRA objects: ResourceClaimTemplates with CEL selectors, matchAttribute constraints, and opaque driver parameters. The user sees a simple interface, but the webhook translates it into a complex DRA allocation request.
+On Kubernetes 1.36+ with the `DRAExtendedResource` feature gate, this maps directly to the composite driver via a DeviceClass. On older clusters, a temporary webhook (included in the Helm chart) creates the appropriate ResourceClaimTemplate.
 
-### Why It Exists
+### Shadow Claims and Per-Device Config
 
-The DRA scheduler handles pairwise `matchAttribute` constraints (same pcieRoot) well. But large-scale LLM inference needs more:
+When kubelet calls the composite driver to prepare an allocated device, the driver:
 
-- **NUMA-aware bin-packing**: A 2-pair request should pack into one NUMA zone. A 4-pair request fills a zone. The scheduler has no packing policy for this.
-- **Rail isolation**: Each NIC must be on a distinct network rail (subnet). There is no "attribute uniqueness" constraint in DRA.
-- **Cross-driver topology at scale**: Allocating 8 GPU-NIC pairs with PCIe pairing, NUMA co-location, and rail isolation simultaneously exceeds what claim-level constraints can express today.
+1. Looks up which underlying GPU and NIC make up the composite pair
+2. Resolves per-rail network configuration based on the actual NIC allocated (the RailConfigResolver matches NIC IP to rail, generates routing table, gateway, MTU, policy routes)
+3. Creates shadow ResourceClaims for each underlying device — pre-filled with allocation results and opaque driver parameters
+4. Delegates device setup to the underlying drivers via gRPC (`gpu.nvidia.com` for GPU visibility, `dra.net` for NIC namespace + routing)
 
-The webhook exists because the scheduler cannot enforce these policies yet.
+Shadow claims have `ownerReferences` to the composite claim — Kubernetes garbage collection handles cleanup automatically.
 
-### The Allocation Pipeline
+This solves the RoCE chicken-and-egg: per-device config is resolved at prepare time from the actual allocated device, not guessed at claim creation time.
 
-The webhook runs a mini-scheduler at admission time:
+### Configuration
 
-1. **Debounce** — Batch concurrent pod creates with a 3-second quiet window. This prevents race conditions when multiple pods are created simultaneously.
-2. **Sort** — Largest pair count first for better packing. This greedy heuristic improves NUMA zone utilization.
-3. **Scan ResourceSlices** — Build a per-node availability map keyed by (node, rail, NUMA zone). This is the webhook's view of cluster state.
-4. **Bin-pack** — Select NUMA zone and rails using a best-fit algorithm. Try to pack small requests into one NUMA zone.
-5. **Create ResourceClaimTemplates** — Generate CEL selectors and matchAttribute constraints for each pair.
-6. **Track pending reservations** — Maintain an in-memory map with a 2-minute TTL. This bridges the gap between admission (when the webhook runs) and scheduling (when the scheduler runs).
+The composite driver is config-driven. Pairing rules are defined in a ConfigMap:
 
-### What It Teaches
+```yaml
+sources:
+  - name: gpu
+    driver: "gpu.nvidia.com"
+    forwardAttributes:
+      - domain: "resource.kubernetes.io"
+        attributes: [pcieRoot]
+  - name: nic
+    driver: "dra.net"
+    forwardAttributes:
+      - domain: "dra.net"
+        attributes: [rdma, ipv4]
+    filter:
+      cel: 'device.attributes["dra.net"].rdma == true'
 
-Each webhook mechanism duplicates a scheduler concern. This table shows the overlap:
+compositions:
+  - name: "gpu-nic-pair"
+    members: [{source: gpu, count: 1}, {source: nic, count: 1}]
+    constraints:
+      - type: matchAttribute
+        attribute: "resource.kubernetes.io/pcieRoot"
+```
 
-| Webhook Mechanism | Scheduler Concern It Duplicates |
+Adding a new underlying driver is a YAML change — zero driver-specific code.
+
+### What It Solves vs What Remains
+
+| Solved by composite driver | Still open |
 |---|---|
-| ResourceSlice scanning + availability map | Scheduler's device accounting |
-| NUMA zone bin-packing | Topology-aware placement policy |
-| Rail exclusivity enforcement | Attribute uniqueness constraints |
-| Pod affinity/anti-affinity re-evaluation | Core scheduler predicate logic |
-| Priority queue serialization | Scheduler's serial pod processing |
-| 2-minute TTL pending reservations | Scheduler's atomic bind cycle |
+| Per-device driver configuration (per-rail routing) | Per-replica unique claims (no workload-layer guarantee for distinct pairs across LWS replicas) |
+| Admission-scheduling race (scheduler allocates natively) | Device-level bin-packing (no packing policy — anti-affinity is the workaround) |
+| Orphan resource cleanup (ownerReferences cascade GC) | Cross-pool device exclusion ([#28](https://github.com/openshift-psap/composite-dra-driver/issues/28)) |
 
-The webhook works. It is in production on multi-node H100 and B200 clusters. But it sees a point-in-time snapshot of cluster state, while the scheduler has the full picture. Every feature in this webhook is a capability the DRA scheduler could provide natively.
-
-Consider the NUMA bin-packing logic. The webhook scans ResourceSlices, counts available GPU-NIC pairs per NUMA zone, and picks the zone with the fewest free slots that can still fit the request. This is a bin-packing heuristic. The scheduler already has topology-aware placement logic for CPU and memory. It could apply the same logic to DRA devices.
-
-Consider rail isolation. The webhook generates CEL selectors with distinct subnet prefixes for each NIC in a claim. This ensures no two NICs in the allocation share a rail. But this is fragile. If a driver publishes NICs with overlapping subnets, or if the subnet scheme changes, the webhook breaks. An attribute uniqueness constraint in the DRA API would be simpler: "each device in this allocation must have a distinct value for attribute X."
-
-The webhook's pending reservation map is the most brittle mechanism. When the webhook approves a pod, it reserves devices in memory with a 2-minute TTL. If the scheduler binds the pod within 2 minutes, the reservation is honored. If not, the reservation expires and the devices become available again. This works, but it is a race. The scheduler's atomic bind cycle eliminates the race. The scheduler reserves devices when it schedules the pod and commits them when it binds the pod. No TTL is needed.
+The remaining gaps are tracked in [wg-device-management #54](https://github.com/kubernetes-sigs/wg-device-management/issues/54) and [dra-roce-challenges.md](../dra-roce-challenges.md).
 
 ## What DRA Cannot Do Yet
 
-Three gaps remain between what the DRA scheduler supports and what topology-aware workloads need:
+Two gaps remain between what the DRA scheduler supports and what topology-aware workloads need:
 
-- **NUMA-aware bin-packing** — There is no placement policy to group device requests by topology attribute with a packing strategy. The scheduler can match devices by attribute, but it does not optimize for packing efficiency.
-- **Attribute uniqueness constraints** — There is no way to express "each device in this allocation must have a distinct value for attribute X" (rail isolation). Users work around this by generating CEL selectors with distinct prefixes, but this is fragile.
-- **Cross-driver topology in the scheduler** — The `matchAttribute` constraint works within claims, but the scheduler's topology-aware scheduling does not yet integrate with DRA device constraints. The scheduler knows about CPU topology (NUMA zones, sockets) and can place pods accordingly. It does not yet use device topology attributes (like NUMA zone or PCIe root) in its placement decisions.
+- **Device-level bin-packing** — The scheduler has no packing policy for device allocation. Small requests can scatter across a node, fragmenting it so larger requests can't be served. Pod anti-affinity between decode and prefill pods is the current workaround. [KEP-5732](https://github.com/kubernetes/enhancements/issues/5732) (Topology-Aware Scheduling, alpha v1.36, DRA integration deferred to v1.37+ beta) and Kueue TAS are the upstream paths.
 
-These gaps are why the admission webhook exists. As the scheduler gains these capabilities, the webhook's allocation logic can be progressively retired.
+- **Per-replica unique claims** — LWS/StatefulSet/JobSet use a single pod template. Each replica gets identical ResourceClaimTemplates. The composite driver mitigates this in practice (500ms synthesizer cycles mean successive replicas see updated availability), but there is no formal scheduler-level guarantee. [KEP-5729](https://github.com/kubernetes/enhancements/issues/5729) confirmed per-replica unique claims out of scope. [#6048](https://github.com/kubernetes/enhancements/issues/6048) (Consume From Resource Claim) may eventually generalize to cover this.
 
 ## Summary
 
@@ -291,9 +308,12 @@ This guide has covered DRA from fundamentals through practical drivers:
 1. **What Is DRA** — The shift from opaque device counts to attribute-based, scheduler-driven allocation.
 2. **How It Works** — ResourceSlices, ResourceClaims, CEL selectors, constraints, and the allocation lifecycle.
 3. **GPU Drivers** — NVIDIA, AMD, and Intel drivers that publish GPU attributes for DRA matching.
-4. **NIC Drivers and Topology** — DRANET, GPU-NIC pairing via matchAttribute, and a real-world webhook showing where the scheduler's limits are.
+4. **NIC Drivers and Topology** — DRANET, GPU-NIC pairing via matchAttribute, and the composite DRA driver that makes multi-driver topology pairing transparent to workload authors.
 
 For deeper dives into the patterns and techniques mentioned here, see the companion documents in this repository:
 
-- [CEL Device Selector Patterns](../cel-selector-patterns.md) — Three production-grade CEL patterns for rail selection, device pinning, and cross-driver topology.
-- [DRA Webhook Best Practices](../dra-webhook-best-practices.md) — Operational patterns for orphan cleanup, batch mutation, extended resource interception, and offline dry-run simulation.
+- [Composite DRA Driver](https://github.com/openshift-psap/composite-dra-driver) — Source code, architecture docs, Helm chart
+- [DRA + llm-d: RoCE Challenges](../dra-roce-challenges.md) — Full gap analysis with upstream KEP tracking
+- [NRI Plugin Explainer](../auxiliary-items/nri-plugin-explainer.md) — What DRANET's NRI plugin does and timeout configuration
+- [CEL Device Selector Patterns](../cel-selector-patterns.md) — Three production-grade CEL patterns for rail selection, device pinning, and cross-driver topology
+- [DRA Webhook Best Practices](../dra-webhook-best-practices.md) — Operational patterns from the previous webhook approach (orphan cleanup, batch mutation, extended resource interception)
