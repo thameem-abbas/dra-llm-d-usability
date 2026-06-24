@@ -2,7 +2,19 @@
 
 **Target:** https://github.com/kubernetes/enhancements/issues/5729
 **Action:** `gh` can post directly
-**Status:** Ready for review
+**Status:** Posted
+**Upstream link:** https://github.com/kubernetes/enhancements/issues/5729#issuecomment-4337498700
+
+### Follow-up (May 2026)
+
+**nojnhuh responded:** Per-replica unique claims is "a different problem than what this KEP is addressing." KEP-5729 covers shared claims per PodGroup only.
+
+**johnbelamaric** acknowledged it as a related problem and committed to think about it (May 1, 2026).
+
+**Implication:** Per-replica unique claims confirmed as a gap. Potential paths:
+- [#6048](https://github.com/kubernetes/enhancements/issues/6048) (Consume From Resource Claim) may address the pool model side
+- Composite Device / Proxy Driver concepts discussed with johnbelamaric may address the cross-driver pairing side
+- A follow-up comment connecting #6048 to our per-replica need may be warranted
 
 ---
 

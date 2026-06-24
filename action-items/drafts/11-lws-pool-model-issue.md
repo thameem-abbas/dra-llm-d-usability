@@ -34,12 +34,15 @@ We're running LLM inference workloads (prefill/decode disaggregation) using LWS 
 
 ### Upstream landscape
 
-We looked at the broader ecosystem and found this gap isn't addressed anywhere:
+The broader ecosystem is evolving:
 
+- **[#6048](https://github.com/kubernetes/enhancements/issues/6048)** (DRA: Consume From Resource Claim, April 2026) — proposes a reservation mechanism where first pod allocates a pool and subsequent pods consume subsets. **Directly addresses pool model.** Early stage, no KEP PR yet. Authored by @johnbelamaric.
 - **KEP #5488** (DRA: UX for multiple multi-host resources) — was the closest unified solution but was [closed by triage bot](https://github.com/kubernetes/enhancements/issues/5488) in April 2026 with no replacement
 - **KEP #4671** (Gang Scheduling / Workload API) — explicitly excludes ResourceClaims
 - **KEP #6012** (CompositePodGroup, targeting Alpha v1.37) — too early to tell if it covers this
 - **JobSet #762** — same template-model gap for JobSet, also stalled
+
+**Note:** If #6048's Consume-From model matures, this LWS issue should reference it as the upstream mechanism rather than proposing a separate pool-model design.
 
 ### Questions for the community
 

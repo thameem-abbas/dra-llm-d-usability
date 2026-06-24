@@ -145,6 +145,8 @@ The `matchAttribute` field references `resource.kubernetes.io/pcieRoot`, an attr
 
 This pattern is the foundation for multi-device, cross-driver topology alignment. Neither driver needs any awareness of the other; the shared attribute and the scheduler constraint do all the coordination.
 
+> **Future: [KEP-6080 (Derived Attributes)](https://github.com/kubernetes/enhancements/issues/6080)** — Once derivedAttributes reaches beta, the standardized attribute requirement in this pattern can be relaxed. Instead of requiring both drivers to publish `resource.kubernetes.io/pcieRoot`, each request defines a `derivedAttributes` entry that extracts its driver-specific topology key via CEL (e.g., `device.attributes['gpu.nvidia.com'].pcieRoot` and `device.attributes['dra.net'].pciRoot`), and `matchAttribute` references the derived name. This eliminates the need for cross-driver attribute name coordination. Targeting Alpha in v1.37.
+
 ## Combining Patterns: Multi-Pair Claims with NUMA Affinity
 
 In practice, these patterns compose. A request for N GPU+NIC pairs generates N request pairs, N PCIe constraints, and (optionally) a NUMA constraint across all NICs. Here is a 2-pair claim with rail pinning and NUMA co-location:

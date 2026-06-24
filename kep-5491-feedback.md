@@ -31,3 +31,34 @@ If a driver migrates `pcieRoot` from `StringValue` to `StringValues`, our prefli
 Our webhook uses `dra.net/numaNode` (int) for NUMA co-location constraints across NICs. SIG-Node discussions have trended toward `resource.kubernetes.io/pcieRoot` as the preferred topology attribute over NUMA, since PCIe root affinity directly captures the data-path relationship that matters for GPU-NIC pairing.
 
 Is `dra.net/numaNode` expected to become list-typed? Under Intel Sub-NUMA Clustering (SNC), one NUMA zone maps to a portion of a socket, so the attribute itself likely remains a single integer -- the issue is that NUMA is the wrong abstraction level for device pairing, not that NUMA needs lists. We plan to migrate our constraints from `numaNode` to `pcieRoot`-only, but clarity on the long-term status of NUMA-based attributes in the DRA ecosystem would help us and other consumers prioritize that work.
+
+## Upstream Response (May 2026)
+
+everpeace (KEP-5491 author) responded to our feedback on May 28, 2026, addressing all three questions:
+
+### 1. Scalar-to-list migration pattern
+
+Consumer code needs explicit care for the type change. There is no API-level convenience (e.g., auto-populating `StringValue` when the list has one element). Consumers that read ResourceSlice attributes directly must check both forms.
+
+### 2. Driver migration guidance
+
+Scalar-as-singleton-set treatment is **purely scheduler-side** — the scheduler is one of the consumers. When a DRA driver ships a type change on an attribute, all consumers of that attribute need explicit handling. everpeace committed to document this migration path in the KEP based on our feedback.
+
+### 3. CEL `.includes()` as universal pattern
+
+**Confirmed**: `.includes()` is the recommended universal pattern. It works on scalar values (the motivation for introducing the function). The recommended safe migration path:
+
+1. When a DRA driver plans a scalar-to-list type change, first migrate `==` to `.includes()` in both driver-side manifests (e.g., `DeviceClass`) and user-side manifests, with a sufficient migration period.
+2. Once the migration period finishes on both sides, the driver ships the actual type change.
+
+**Note**: `.includes()` is still behind the `DRAListTypesForAttributes` feature gate as of v1.36.
+
+### Related: KEP-5978 (ClusterResourceClaimTemplate)
+
+everpeace noted that [KEP-5978](https://github.com/kubernetes/enhancements/issues/5978) aims to reduce the operational complexity of defining common ResourceClaim/ResourceClaimTemplate objects repeatedly across a cluster — related to our webhook's approach of generating complex claims from a simple synthetic annotation. Parameterized ResourceClaims were discussed in Slack but hit implementation difficulties.
+
+### Impact on Our Webhook
+
+1. **CEL selectors**: Proactively migrate `==` comparisons to `.includes()` in our CEL selector templates (e.g., `device.attributes["dra.net"].rdma == true` → `.includes(true)`)
+2. **Preflight code**: Update `getPCIeRoot()` and NUMA grouping to handle both `StringValue`/`StringValues` and `IntValue`/`IntValues` forms
+3. **Timeline**: KEP-5491 staying alpha for v1.37, targeting second alpha

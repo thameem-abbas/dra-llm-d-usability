@@ -16,7 +16,7 @@ DRA's current MatchAttribute handles pairwise attribute matching within a single
 
 ## What We Built
 
-The webhook intercepts pod CREATE requests and runs a full allocation pipeline before the scheduler sees the pod:
+The webhook intercepts pod CREATE requests via two endpoints (`/mutate` for labeled namespaces with full topology features, `/mutate-ext` for cluster-wide extended resource interception) and runs a full allocation pipeline before the scheduler sees the pod:
 
 **Cluster-wide resource scanning.** The allocator lists ResourceSlices, extracts device attributes (IPv4 addresses, NUMA zones), and builds a per-node availability map of NIC slots keyed by `(node, railIndex, numaZone)`.
 
@@ -49,6 +49,49 @@ The webhook cannot observe actual DRA allocation outcomes -- it guesses based on
 
 ## Topology Dimensions We Need
 
+### Node Topology Overview
+
+```
+                          Node (8 GPU-NIC pairs, e.g. B200)
+    ┌─────────────────────────────────────────────────────────────┐
+    │                                                             │
+    │   NUMA Zone 0                      NUMA Zone 1              │
+    │  ┌───────────────────────┐       ┌───────────────────────┐  │
+    │  │                       │       │                       │  │
+    │  │  PCIe Root 0x00       │       │  PCIe Root 0x80       │  │
+    │  │  ┌─────┐  ┌─────┐    │       │  ┌─────┐  ┌─────┐    │  │
+    │  │  │GPU-0│  │NIC-0│    │       │  │GPU-4│  │NIC-4│    │  │
+    │  │  │     │──│Rail0│    │       │  │     │──│Rail0│    │  │
+    │  │  └─────┘  └─────┘    │       │  └─────┘  └─────┘    │  │
+    │  │  ┌─────┐  ┌─────┐    │       │  ┌─────┐  ┌─────┐    │  │
+    │  │  │GPU-1│  │NIC-1│    │       │  │GPU-5│  │NIC-5│    │  │
+    │  │  │     │──│Rail1│    │       │  │     │──│Rail1│    │  │
+    │  │  └─────┘  └─────┘    │       │  └─────┘  └─────┘    │  │
+    │  │  ┌─────┐  ┌─────┐    │       │  ┌─────┐  ┌─────┐    │  │
+    │  │  │GPU-2│  │NIC-2│    │       │  │GPU-6│  │NIC-6│    │  │
+    │  │  │     │──│Rail2│    │       │  │     │──│Rail2│    │  │
+    │  │  └─────┘  └─────┘    │       │  └─────┘  └─────┘    │  │
+    │  │  ┌─────┐  ┌─────┐    │       │  ┌─────┐  ┌─────┐    │  │
+    │  │  │GPU-3│  │NIC-3│    │       │  │GPU-7│  │NIC-7│    │  │
+    │  │  │     │──│Rail3│    │       │  │     │──│Rail3│    │  │
+    │  │  └─────┘  └─────┘    │       │  └─────┘  └─────┘    │  │
+    │  │                       │       │                       │  │
+    │  └───────────────────────┘       └───────────────────────┘  │
+    │                                                             │
+    │  Network Rails:  Rail0 = 10.0.x.x    Rail1 = 10.1.x.x      │
+    │                  Rail2 = 10.2.x.x    Rail3 = 10.3.x.x      │
+    │                                                             │
+    │  Drivers:  GPU → gpu.nvidia.com    NIC → dra.net            │
+    │  Pairing:  MatchAttribute on resource.kubernetes.io/pcieRoot│
+    └─────────────────────────────────────────────────────────────┘
+
+    Constraint examples:
+    • 2-pair request → pack into NUMA Zone 0 (bin-pack smallest-first)
+    • 4-pair request → fill one NUMA zone entirely
+    • 8-pair request → whole node
+    • Rail isolation: each NIC in a request on a distinct rail subnet
+```
+
 Three topology dimensions govern GPU-NIC pair placement:
 
 1. **PCIe root complex** -- pairs a GPU and NIC on the same PCIe tree. Expressible via MatchAttribute within a single claim; cross-claim PCIe affinity would require Placement-level constraints.
@@ -61,6 +104,8 @@ KEP-5732's Placement primitives could express all three, provided constraints sp
 
 **KEP-5732 alpha status (v1.36).** Kubernetes v1.36 shipped the alpha with `SchedulingConstraints` (containing `TopologyConstraints` and `DRAConstraints`) on the PodGroup API, plus new scheduler plugins: TopologyPlacementPlugin, PlacementBinPackingPlugin, and PlacementPodCountScorerPlugin. However, DRA-aware topology scheduling was explicitly deferred to beta -- the DRATestPlugin PR was closed without merge. The scheduler cannot yet combine topology placement with DRA device constraints, which is exactly the gap our webhook fills.
 
+**Related: [#6006](https://github.com/kubernetes/enhancements/issues/6006) (Health-Aware Topology).** Recent KubeCon in-person discussion (April 2026) exploring performance-based device placement — accounting for cooling differences, network run lengths, and burn-in variance. Relevant for environments where not all GPU-NIC pairs on a node perform identically.
+
 ## Request
 
 We are asking for native scheduler support for multi-device, cross-driver topology constraints so that admission webhooks do not have to reimplement scheduling. Specifically:
@@ -70,4 +115,4 @@ We are asking for native scheduler support for multi-device, cross-driver topolo
 - **Cross-driver MatchAttribute**: MatchAttribute constraints that span device classes from different drivers within a Placement group.
 - **Beyond KEP-5004's scope**: KEP-5004 (Extended Resources Bridge, beta in v1.36) allows `resources.requests` syntax to trigger DRA claims via `extendedResourceName` in DeviceClass. However, it does not support CEL selectors, matchAttribute constraints, or multi-device pairing -- reinforcing that complex topology allocation still requires native Placement primitives.
 
-Our webhook is ~1500 lines of Go that would reduce to a ResourceClaimTemplate with the right Placement annotations. The code is open source at [openshift-psap/dra-admission-webhook](https://github.com/openshift-psap/dra-admission-webhook) and targets multi-node B200 clusters with 8 GPU-NIC pairs per node.
+Our webhook has grown to ~6000+ lines of Go (from ~1500 originally) as we added InfiniBand support (auto-detection + explicit `ibRails` config), extended resource interception (`nvidia.com/gpu` → DRA claims via `/mutate-ext`), AKS kustomize overlays, and an offline dry-run simulator. The core topology allocation logic would reduce to a ResourceClaimTemplate with the right Placement annotations. The code is open source at [openshift-psap/dra-rail-admission-webhook](https://github.com/openshift-psap/dra-rail-admission-webhook) and targets multi-node GPU clusters (B200, H100) with 8 GPU-NIC pairs per node across Ethernet and InfiniBand fabrics.
