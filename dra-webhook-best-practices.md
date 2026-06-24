@@ -7,7 +7,8 @@ DRA mutating admission webhooks often need to create ResourceClaimTemplates or o
 ## Webhook Admission Flow
 
 ```
-    Pod CREATE request (dra.llm-d.io/gpu-nic-pair: "N")
+    Pod CREATE request (composite.dra.io/gpu-nic-pair: "N")
+    # previously: dra.llm-d.io/gpu-nic-pair (webhook interception via synthetic resource)
          │
          ▼
     ┌──────────────┐
@@ -101,7 +102,7 @@ The webhook now supports a `/mutate-ext` endpoint that intercepts standard exten
 **Key differences from `/mutate`:**
 - **Scope**: `/mutate-ext` operates on all non-system namespaces (no label required). `/mutate` requires `dra.llm-d.io/webhook-enabled: "true"`.
 - **Failure policy**: `/mutate-ext` uses `Ignore` (pods pass through if webhook is down). `/mutate` uses `Fail`.
-- **Mutual exclusivity**: A pod cannot request both `dra.llm-d.io/gpu-nic-pair` and an intercepted resource.
+- **Mutual exclusivity**: A pod cannot request both `composite.dra.io/gpu-nic-pair` (previously `dra.llm-d.io/gpu-nic-pair`) and an intercepted resource.
 - **Per-container binding**: Each container gets claim references only for GPUs it requested.
 
 ## Pattern 4: Offline Dry-Run Simulation

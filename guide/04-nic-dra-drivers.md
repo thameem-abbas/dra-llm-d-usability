@@ -225,9 +225,9 @@ This section frames an admission webhook as a teaching example. The webhook hand
 The DRA admission webhook is a mutating admission webhook built for LLM inference workloads. A user requests GPU-NIC pairs with a simple annotation:
 
 ```yaml
-metadata:
-  annotations:
-    dra.llm-d.io/gpu-nic-pairs: "4"
+resources:
+  requests:
+    composite.dra.io/gpu-nic-pair: "4"   # previously: dra.llm-d.io/gpu-nic-pairs annotation (webhook approach)
 ```
 
 The webhook intercepts the pod CREATE request and generates full DRA objects: ResourceClaimTemplates with CEL selectors, matchAttribute constraints, and opaque driver parameters. The user sees a simple interface, but the webhook translates it into a complex DRA allocation request.

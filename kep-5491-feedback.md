@@ -1,5 +1,7 @@
 # Consumer Feedback: DRA Admission Webhook Using pcieRoot/numaNode MatchAttribute Constraints
 
+> **Note:** This document was written against the webhook approach. The synthetic resource name `dra.llm-d.io/gpu-nic-pair` has since been replaced by `composite.dra.io/gpu-nic-pair` (composite DRA driver). The DRA mechanics described here (matchAttribute, CEL selectors, pcieRoot) remain accurate.
+
 ## Our Use Case
 
 We operate a mutating admission webhook for LLM inference workloads that converts a synthetic resource request (`dra.llm-d.io/gpu-nic-pair: "N"`) into full DRA ResourceClaimTemplates pairing NVIDIA GPUs with RDMA NICs. Each GPU-NIC pair is constrained via `matchAttribute` on `resource.kubernetes.io/pcieRoot` (string) to ensure PCIe root affinity, and optionally via `matchAttribute` on `dra.net/numaNode` (int) for NUMA co-location across NICs. Beyond claim generation, the webhook also reads ResourceSlices directly to perform preflight availability checking and cluster-level allocation decisions before admitting pods.

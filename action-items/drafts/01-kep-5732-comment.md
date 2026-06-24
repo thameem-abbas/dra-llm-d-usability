@@ -3,6 +3,7 @@
 **Target:** https://github.com/kubernetes/enhancements/issues/5732
 **Action:** `gh` can post directly
 **Status:** Ready for review
+**Note:** Comment body uses `dra.llm-d.io/gpu-nic-pair` (webhook-era name). Current name: `composite.dra.io/gpu-nic-pair`. Comment body is historically accurate as posted.
 
 ---
 

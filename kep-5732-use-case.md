@@ -1,5 +1,7 @@
 # Use Case: GPU-NIC Topology-Aware Allocation via DRA Admission Webhook
 
+> **Note:** This document was written against the webhook approach. The synthetic resource name `dra.llm-d.io/gpu-nic-pair` has since been replaced by `composite.dra.io/gpu-nic-pair` (composite DRA driver), which eliminates the need for a mutating webhook. The scheduler-level gaps described here remain accurate and are the motivation for the composite driver.
+
 ## Summary
 
 We've built a Kubernetes mutating admission webhook that converts a synthetic resource request (`dra.llm-d.io/gpu-nic-pair: "N"`) into full DRA objects -- ResourceClaimTemplates with PCIe MatchAttribute constraints, NUMA co-location constraints, CEL-based rail selectors, and opaque driver parameters. The webhook exists because DRA's scheduler cannot express multi-device, cross-driver topology constraints. Every component -- NUMA-aware packing, PCIe root affinity, rail-aware NIC selection, pod affinity filtering, priority queue serialization, and pending reservation tracking -- is scheduler logic forced into an admission webhook. KEP-5732's Placement primitives would eliminate it.

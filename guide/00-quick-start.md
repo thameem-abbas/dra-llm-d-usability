@@ -18,7 +18,7 @@ spec:
       image: my-image
       resources:
         requests:
-          dra.llm-d.io/gpu-nic-pair: "4"
+          composite.dra.io/gpu-nic-pair: "4"   # previously: dra.llm-d.io/gpu-nic-pair (webhook approach)
 ```
 
 That's it. The webhook intercepts this request and generates the DRA objects (ResourceClaimTemplates, CEL selectors, matchAttribute constraints) needed to allocate 4 GPU-NIC pairs with correct PCIe topology. Your pod will get 4 GPUs, each paired with an RDMA NIC on the same PCIe root complex.
@@ -56,7 +56,7 @@ resources:
 
 The `/mutate-ext` endpoint converts this to DRA ResourceClaims automatically. This works in all non-system namespaces without the label requirement. Each container gets claim references only for the GPUs it requested.
 
-**Note:** A pod cannot request both `dra.llm-d.io/gpu-nic-pair` and `nvidia.com/gpu`. Use one or the other.
+**Note:** A pod cannot request both `composite.dra.io/gpu-nic-pair` and `nvidia.com/gpu`. Use one or the other.
 
 ## What You Get
 

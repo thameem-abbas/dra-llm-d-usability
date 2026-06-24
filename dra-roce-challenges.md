@@ -136,7 +136,7 @@ Users request GPU-NIC pairs the same way they request GPUs today:
 ```yaml
 resources:
   requests:
-    composite.dra/gpu-nic-pair: "4"
+    composite.dra.io/gpu-nic-pair: "4"
 ```
 
 On Kubernetes 1.36+ with the `DRAExtendedResource` feature gate, this maps directly to the composite DRA driver via a DeviceClass — no webhook needed, the scheduler handles it natively. On older clusters, a temporary webhook (included in the Helm chart) intercepts the synthetic resource, creates the appropriate ResourceClaimTemplate, and patches the pod. 
@@ -221,7 +221,7 @@ On Kubernetes 1.36+ with the `DRAExtendedResource` feature gate, this maps direc
     ┌─────────────────────────────────────┐
     │ resources:                          │
     │   requests:                         │
-    │     composite.dra/gpu-nic-pair: "4" │
+    │     composite.dra.io/gpu-nic-pair: "4" │
     └──────────────────┬──────────────────┘
                        │
                        ▼
